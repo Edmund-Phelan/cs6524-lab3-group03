@@ -1,0 +1,35 @@
+name: Python and LaTeX Build Pipeline
+
+on:
+  push:
+    branches: [ "main", "master" ]
+
+jobs:
+  build-and-compile:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      
+      - name: Run Python Script (main.py)
+        run: |
+          docker run --rm \
+          -v ${{ github.workspace }}:/workspace \
+          jfhernandeza/ul-cs6524-cv-python-latex:lab01 python main.py
+      
+      - name: Compile LaTeX Document (report.tex)
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            jfhernandeza/ul-cs6524-cv-python-latex:lab01 latexmk -pdf -interaction=nonstopmode -halt-on-error report.tex
+      
+      - name: Upload Report and Output Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cs6524-cv-lab-artifacts
+          path: |
+            report.pdf
+            out/
+          overwrite: true
+          if-no-files-found: warn
