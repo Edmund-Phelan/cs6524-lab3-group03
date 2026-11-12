@@ -1,6 +1,7 @@
 import numpy as np
 
 from mypylibs.sfm import load_camera, read_frames, relative_poses, triangulate_pairs, undistort
+from mypylibs.visualise import save_video
 
 ROOT_IN = 'in'
 ROOT_OUT = 'out'
@@ -15,6 +16,7 @@ def main(name: str):
     K, D = load_camera(ROOT_IN)
     frames = undistort(read_frames(f'{ROOT_IN}/{name}.mp4')[::STEP[name]], K, D)
     poses, feats = relative_poses(frames, K)
+    save_video(frames, feats, f'{ROOT_OUT}/{name}_overlay.mp4')
 
     ok = [p for p in poses if p is not None]
     angles = [np.degrees(np.arccos(np.clip((np.trace(p['R']) - 1) / 2, -1, 1))) for p in ok]
