@@ -1,2 +1,4 @@
 # Do not ignore this file so the folder structure remains
 !.gitignore
+# original full-res phone videos (too big for the repo)
+raw/
