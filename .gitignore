@@ -7,3 +7,6 @@
 *.log
 *.run.xml
 *.pdf
+__pycache__/
+.claude-flow/
+.claude/
