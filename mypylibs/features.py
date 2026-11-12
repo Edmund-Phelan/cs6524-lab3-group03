@@ -16,6 +16,7 @@ DEFAULTS = {
     "ratio": 0.75,         # Lowe's ratio test
     "ransac_thresh": 1.0,  # px; inlier threshold for the essential-matrix RANSAC
     "min_track_len": 2,    # tracks seen in fewer frames are discarded
+    "min_motion": 0.0,     # px; drop matches moving less (static background when the object spins)
 }
 
 
@@ -103,6 +104,9 @@ def run(frames, K, cfg: dict | None = None) -> FeatureResult:
     pair_matches, essentials = [], []
     for f1, f2 in pairwise(feats):
         m = ratio_match(f1, f2, c["ratio"])
+        # Static points satisfy x2^T E x1 = 0 for any E with R ~ I, so with a still camera
+        # they outvote the spinning object in RANSAC. Remove them first.
+        m = m[np.linalg.norm(f2.pts[m[:, 1]] - f1.pts[m[:, 0]], axis=1) >= c["min_motion"]]
         m, E = geometric_filter(f1, f2, m, K, c["ransac_thresh"])
         pair_matches.append(m)
         essentials.append(E)
