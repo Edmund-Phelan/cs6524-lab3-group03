@@ -10,3 +10,4 @@
 __pycache__/
 .claude-flow/
 .claude/
+.DS_Store
