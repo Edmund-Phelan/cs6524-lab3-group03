@@ -1,6 +1,6 @@
 import numpy as np
 
-from mypylibs.sfm import load_camera, read_frames, relative_poses, undistort
+from mypylibs.sfm import load_camera, read_frames, relative_poses, triangulate_pairs, undistort
 
 ROOT_IN = 'in'
 ROOT_OUT = 'out'
@@ -23,6 +23,11 @@ def main(name: str):
     print(f'{name}: {len(frames)} frames, {len(ok)}/{len(poses)} pairs posed, '
           f'median inliers {int(np.median([len(p["p1"]) for p in ok]))}, '
           f'total rotation {sum(angles):.1f} deg')
+
+    tri = [p for p in triangulate_pairs(poses, K) if p is not None]
+    err = np.concatenate([np.r_[p['err1'], p['err2']] for p in tri])
+    print(f'{name}: {sum(len(p["X"]) for p in tri)} points triangulated, '
+          f'reprojection error median {np.median(err):.2f} px, mean {err.mean():.2f} px')
 
 
 if __name__ == '__main__':

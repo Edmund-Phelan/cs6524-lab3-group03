@@ -2,6 +2,8 @@
 
 Step 3: undistort frames, essential matrix E and relative pose (R, t) for every
 pair of consecutive frames.
+Step 4: triangulate each pair's inlier points into 3D (camera i at the origin)
+and measure the reprojection error in both frames.
 """
 import cv2
 import numpy as np
@@ -70,6 +72,44 @@ def relative_poses(frames, K, cfg=None):
     return poses, feats
 
 
+def triangulate(R, t, p1, p2, K):
+    """3D points (N,3) in camera-1 coords, with camera 1 = K[I|0] and camera 2 = K[R|t]."""
+    P1 = K @ np.hstack([np.eye(3), np.zeros((3, 1))])
+    P2 = K @ np.hstack([R, t.reshape(3, 1)])
+    Xh = cv2.triangulatePoints(P1, P2, p1.T.astype(np.float64), p2.T.astype(np.float64))
+    return (Xh[:3] / Xh[3]).T
+
+
+def reproject(X, R, t, K):
+    """Project 3D points (N,3) into a camera with pose x_cam = R X + t. Returns (N,2) pixels."""
+    proj, _ = cv2.projectPoints(X, cv2.Rodrigues(R)[0], t.reshape(3, 1).astype(np.float64), K, None)
+    return proj.reshape(-1, 2)
+
+
+def triangulate_pairs(poses, K):
+    """Step 4 for every consecutive pair posed in step 3.
+
+    Returns, per pair, a dict with X (3D points in camera-i coords, in units of
+    |t| = 1), the matching p1/p2 pixels, and err1/err2: per-point reprojection
+    error in pixels in frame i and frame i+1. Points behind either camera are
+    dropped. Pairs without a pose stay None.
+    """
+    out = []
+    for pose in poses:
+        if pose is None:
+            out.append(None)
+            continue
+        R, t, p1, p2 = pose['R'], pose['t'], pose['p1'], pose['p2']
+        X = triangulate(R, t, p1, p2, K)
+        z2 = (X @ R.T + t.reshape(1, 3))[:, 2]
+        keep = np.isfinite(X).all(axis=1) & (X[:, 2] > 0) & (z2 > 0)
+        X, p1, p2 = X[keep], p1[keep], p2[keep]
+        err1 = np.linalg.norm(reproject(X, np.eye(3), np.zeros(3), K) - p1, axis=1)
+        err2 = np.linalg.norm(reproject(X, R, t, K) - p2, axis=1)
+        out.append({'X': X, 'p1': p1, 'p2': p2, 'err1': err1, 'err2': err2})
+    return out
+
+
 if __name__ == '__main__':
     # Self-check: synthetic scene with known motion, recovered R and t direction must match
     rng = np.random.default_rng(0)
@@ -83,4 +123,9 @@ if __name__ == '__main__':
     _, R, t, _ = cv2.recoverPose(E, p1, p2, K, mask=m)
     assert np.allclose(R, R_true, atol=1e-3), R
     assert np.allclose(t, t_true / np.linalg.norm(t_true), atol=1e-3), t
+    # Step 4: triangulated points equal the true ones up to the scale 1/|t_true|
+    tri = triangulate_pairs([{'R': R, 't': t, 'p1': p1, 'p2': p2}], K)[0]
+    assert len(tri['X']) == len(X)
+    assert np.allclose(tri['X'], X / np.linalg.norm(t_true), rtol=1e-2), tri['X'][:3]
+    assert tri['err1'].max() < 0.1 and tri['err2'].max() < 0.1
     print('ok')
