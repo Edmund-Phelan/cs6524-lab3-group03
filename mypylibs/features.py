@@ -14,7 +14,6 @@ DEFAULTS = {
     "n_features": 2000,    # keep the N strongest SIFT keypoints per frame
     "contrast": 0.04,      # SIFT contrastThreshold; lower -> more keypoints
     "ratio": 0.75,         # Lowe's ratio test
-    "min_disp": 0.0,       # px; >0 drops static (background) matches, for video b
     "ransac_thresh": 1.0,  # px; inlier threshold for the essential-matrix RANSAC
     "min_track_len": 2,    # tracks seen in fewer frames are discarded
 }
@@ -66,14 +65,6 @@ def ratio_match(f1: Features, f2: Features, ratio=0.75) -> np.ndarray:
     return np.array([(q, t) for t, (_, q) in best.items()], dtype=int).reshape(-1, 2)
 
 
-def drop_static(f1: Features, f2: Features, matches: np.ndarray, min_disp=2.0) -> np.ndarray:
-    """Remove matches that moved less than min_disp pixels (static background)."""
-    if len(matches) == 0:
-        return matches
-    d = np.linalg.norm(f1.pts[matches[:, 0]] - f2.pts[matches[:, 1]], axis=1)
-    return matches[d >= min_disp]
-
-
 def geometric_filter(f1: Features, f2: Features, matches: np.ndarray, K, thresh=1.0):
     """Keep matches consistent with one camera motion. Returns (inlier matches, E or None)."""
     if len(matches) < 8:
@@ -112,8 +103,6 @@ def run(frames, K, cfg: dict | None = None) -> FeatureResult:
     pair_matches, essentials = [], []
     for f1, f2 in pairwise(feats):
         m = ratio_match(f1, f2, c["ratio"])
-        if c["min_disp"] > 0:
-            m = drop_static(f1, f2, m, c["min_disp"])
         m, E = geometric_filter(f1, f2, m, K, c["ransac_thresh"])
         pair_matches.append(m)
         essentials.append(E)

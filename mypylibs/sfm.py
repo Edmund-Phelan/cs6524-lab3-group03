@@ -8,10 +8,7 @@ and measure the reprojection error in both frames.
 import cv2
 import numpy as np
 
-try:
-    from mypylibs import features
-except ImportError:  # run directly as python mypylibs/sfm.py
-    import features
+from mypylibs import features
 
 
 def load_camera(root='in'):
