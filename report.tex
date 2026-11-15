@@ -29,12 +29,12 @@ Student ID 23382163}
 \maketitle
 
 \begin{abstract}
-% EDDIE (write last, ~5 lines): what was built, headline result, headline failure.
-%  - Pipeline: SIFT tracks -> essential matrix per pair -> PnP + bundle adjustment over N frames.
-%  - Headline result: video a, all 58 frames registered, closed 360 deg loop (369 deg summed),
-%    median reprojection error 0.27 px.
-%  - Headline failure: video b (spinning object) only survives the true focal length;
-%    one slow frame pair breaks the chain. Dense step was attempted and dropped.
+We reconstruct a Bulbasaur figure from two phone videos: one with the camera
+circling the figure (a) and one with the figure spinning in front of a still
+camera (b). SIFT tracks give a pose for each frame pair, and PnP with bundle
+adjustment joins all frames into one sparse model. Video a registers all 58
+frames, with 0.27\,px median error and a closed 360$^\circ$ loop. Video b only
+works at the true focal length, since one slow frame pair breaks the chain.
 \end{abstract}
 
 \section{Setup}
