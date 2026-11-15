@@ -54,17 +54,16 @@ Student ID 23382163}
 \section{Methodology}
 
 \subsection{Features and Tracks}
-% ANDREW (~1 paragraph), mypylibs/features.py:
-%  - SIFT \cite{lowe2004sift}, 2000 strongest keypoints/frame, brute-force L2 matching of
-%    consecutive frames.
-%  - Lowe ratio test 0.75 + one-to-one constraint (why: otherwise two physical points
-%    merge into one track).
-%  - RANSAC on the essential matrix, 1 px threshold, removes outliers; E is reused in II-B.
-%  - Matches chained into tracks {frame: keypoint}; tracks are what link >2 frames in II-C.
-%  - Video b only: matches moving < 1 px dropped (static background). Without it the
-%    background outvotes the object (step 5 summed rotation 103 deg vs ~360 deg).
 
-\subsection{Pairwise Pose and Triangulation}
+We detect SIFT~\cite{lowe2004sift} keypoints in each frame (median 369 in a,
+533 in b). Consecutive frames are matched with Lowe's ratio test (0.75), and
+matches are kept one-to-one. RANSAC on the essential matrix (1\,px) then leaves
+about 107 inliers per frame pair. Chaining these matches gives tracks. In total,
+411 tracks in a and 980 in b span five or more frames. In video b we drop
+matches that move less than 1\,px. Otherwise the static background outvotes the
+spinning object.
+
+\subsection{Pairwise Pose and Triangulation}\label{sec:pose}
 % ANDREW (~1 paragraph), relative_poses + triangulate_pairs in sfm.py:
 %  - cv2.recoverPose(E) -> R, t with |t| = 1 (scale unknown in monocular SfM); the
 %    cheirality check picks 1 of the 4 decompositions \cite{foundationsCVbook}.
@@ -76,7 +75,7 @@ Student ID 23382163}
 %    collapse: with 2 views and RANSAC at 1 px it is near zero by construction, so it says
 %    nothing about the final reconstruction. One or two sentences, this is a key insight.
 
-\subsection{N-Frame Reconstruction}
+\subsection{N-Frame Reconstruction}\label{sec:nframe}
 % EDDIE (~1 paragraph), reconstruct + bundle_adjust in sfm.py:
 %  - Init pair: first pair with >= 50 shared tracks and >= 3 deg rotation (why not
 %    frames 0-1: b barely moves at the start, 0.1 deg).
