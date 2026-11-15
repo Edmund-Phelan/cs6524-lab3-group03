@@ -87,14 +87,15 @@ small by construction. It therefore says little about the final reconstruction.
 %  - Output: sparse cloud coloured from the frames -> the PLY files.
 
 \section{Results}
-% ANDREW (~1 paragraph before the table):
-%  - Sensitivity setup (main.py): fx, fy scaled by 0.8, 1.0, 1.2; the scaled K is used
-%    everywhere, undistortion included (simulates a consistently wrong calibration). State
-%    this choice clearly. Each with and without undistortion -> 6 runs per video, 12 PLYs.
-%  - Metrics: frames registered, sparse points, step-5 median reprojection error, summed
-%    rotation between consecutive registered frames (should be ~360 deg for a full turn).
-%  - Point readers to the key rows (a_10u best; a_08d and the non-1.0 b runs collapse).
-%    Interpretation goes in IV, not here.
+For the sensitivity analysis we scale $f_x$ and $f_y$ by 0.8, 1.0 and 1.2. The
+scaled $K$ is used in every step, including undistortion. Each factor is run
+with and without undistortion, giving six runs per video. Table~\ref{tab:sens}
+reports the frames registered in Section~\ref{sec:nframe}, the sparse points,
+their median reprojection error and the summed rotation between consecutive
+cameras. A full turn around the Bulbasaur should give about 360$^\circ$. The
+reference run a\_10u registers all 58 frames with 0.27\,px error and
+369$^\circ$ of rotation. Two groups of runs collapse: a\_08d registers only 9
+frames, and video b registers at most 66 of 125 frames at factors 0.8 and 1.2.
 
 \begin{table}[t]
 \caption{Sensitivity analysis: 12 runs (focal factor $\times$ undistortion)}
