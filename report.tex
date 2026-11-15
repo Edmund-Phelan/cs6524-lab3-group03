@@ -81,15 +81,23 @@ later collapse. With only two views and a 1\,px RANSAC threshold, the error is
 small by construction. It therefore says little about the final reconstruction.
 
 \subsection{N-Frame Reconstruction}\label{sec:nframe}
-% EDDIE (~1 paragraph), reconstruct + bundle_adjust in sfm.py:
-%  - Init pair: first pair with >= 50 shared tracks and >= 3 deg rotation (why not
-%    frames 0-1: b barely moves at the start, 0.1 deg).
-%  - Each later frame: PnP-RANSAC on tracks that already have a 3D point -> pose in the
-%    same world frame and scale; then triangulate new tracks (>= 1 deg parallax, < 4 px).
-%  - Local bundle adjustment of the last 8 poses every 5 frames, one global BA at the end,
-%    Huber loss f_scale = 2 px (why 2 px and not 1 px: your synthetic test, 4 vs 0.3 deg)
-%    \cite{foundationsCVbook}.
-%  - Output: sparse cloud coloured from the frames -> the PLY files.
+Pairwise poses each have their own origin and scale, so they cannot simply be
+chained. We start from the first frame pair that shares at least 50 tracks and
+rotates by at least 3$^\circ$. Frames 0 and 1 are not a safe choice: in video b
+they are only 0.1$^\circ$ apart, and such a short baseline gives useless
+depths. This pair fixes the world frame and the scale. Every later frame is
+registered with PnP and RANSAC (4\,px) on its tracks that already have a 3D
+point, so its pose lands in the same frame and scale. A frame with fewer than
+six such points is skipped. Tracks without a point are then triangulated
+against the earliest registered frame that sees them. A new point is kept only
+if it has at least 1$^\circ$ of parallax and reprojects within 4\,px. Every
+five frames, bundle adjustment~\cite{foundationsCVbook} refines the last eight
+poses and their points, with the older cameras held fixed to anchor the scale.
+One global pass runs at the end. The loss is Huber with a 2\,px scale. At 1\,px
+most honest residuals sit in the linear part and the solver stalls: on a
+synthetic 16-frame orbit it drifted 4$^\circ$, against 0.3$^\circ$ at 2\,px.
+Points with a mean error above 4\,px are dropped. The rest are coloured from
+their first frame and written to the PLY file.
 
 \section{Results}
 For the sensitivity analysis we scale $f_x$ and $f_y$ by 0.8, 1.0 and 1.2. The
@@ -129,32 +137,45 @@ b\_12d & 43/125 & 2471 & 0.23 & 78.6 \\
 % ANDREW: re-check these against out/metrics.csv after the final run if any code changes.
 \end{table}
 
-% EDDIE: Figure 1, top-down view of the recovered camera centres + sparse cloud for
-% a_10u (closed loop around the object) and b_10u (uneven arc). Save as
-% assets/latex/trajectory.png, then uncomment the block below.
-% \begin{figure}[t]
-% \centerline{\includegraphics[width=\columnwidth]{trajectory.png}}
-% \caption{Top view of camera centres (red) and sparse points for videos a (left) and b (right).}
-% \label{fig:traj}
-% \end{figure}
+\begin{figure}[t]
+\centerline{\includegraphics[width=\columnwidth]{trajectory.png}}
+\caption{Top view of the camera centres (red, triangle = first registered
+frame) and sparse points for a\_10u (left) and b\_10u (right).}
+\label{fig:traj}
+\end{figure}
 
 \section{Discussion and Failure Analysis}
-% EDDIE, paragraph 1: sensitivity of video a (focal length + distortion).
-%  - a tolerates a wrong focal length: all/most frames registered at 0.8 and 1.2, but the
-%    summed rotation inflates (369 -> 392-403 deg): wrong f distorts angles, so the loop
-%    no longer closes.
-%  - Distortion matters in combination: a_10d is fine (375 deg), a_08d collapses (9/58).
-%    Explain why error in f + uncorrected k1..k3 pushes PnP past its tolerance.
+Video a tolerates a wrong focal length. At factors 0.8 and 1.2 it still
+registers 54 to 58 frames. At the true focal length the path closes into a
+loop (Fig.~\ref{fig:traj}, left) and overshoots its start by 9$^\circ$.
+The cost of a wrong $f$ shows in the summed rotation, which grows from 369$^\circ$ to
+392--403$^\circ$ in both directions. With a wrong $f$ no rigid scene fits the
+tracks, and bundle adjustment spreads the misfit over the poses as jitter. Our
+metric sums rotation magnitudes, so jitter can only add to it. Distortion alone
+is also absorbed: a\_10d registers every frame. The two errors together are not.
+In a\_08d, PnP has only 25--28 3D points per frame, against 55--80 in a\_10d,
+because fewer tracks pass the 4\,px triangulation test. Frames 10--11 are the
+weakest part of video a in every run, with about 10 tracks spanning four frames
+instead of about 40. There the supply drops to 8 points and then below the
+minimum of six, and no later frame registers. Its 0.18\,px error is the lowest
+in Table~\ref{tab:sens}, so a low reprojection error does not show that a run
+worked. We could not explain why a\_12d survives where a\_08d does not.
 
-% EDDIE, paragraph 2: failure of video b.
-%  - Only the true focal length survives: 36-43/125 frames at 0.8 and 1.2.
-%  - Single point of failure at frame pair 36: object nearly pauses (hand repositioning?).
-%    With the 1 px motion filter only 35 inliers remain there (vs ~150) and 4-9 tracks span
-%    it, so PnP loses the chain. 0.5 px keeps 146 inliers / ~72 tracks.
-%  - Camera path (Fig. 1) is an arc, not a circle, even in the best run: the
-%    spinning-object = orbiting-camera equivalence only holds if nothing static is matched.
-%  - Supporting evidence: b_10u registers 122/125 frames on macOS but 35/125 in the CI
-%    Docker image (different OpenCV build) -> b sits on a knife edge.
+Video b fails at one place. Around frames 36--37 the figure almost stops
+turning. The 1\,px motion filter then leaves fewer than 40 inlier matches for
+that pair, against about 150 for its neighbours. At the true focal length the
+next frame is registered from 7 points, one more than the minimum, and the
+frame after from 102. At factors 0.8 and 1.2 the count falls below six and the
+chain never restarts, which is why those runs stop at 36--43 frames. Lowering
+the filter to 0.5\,px keeps 167 inliers at that pair and registers 124 frames,
+but the static background returns and the summed rotation falls to
+182$^\circ$. Even the best run is fragile. With the same code, b\_10u sums to
+362$^\circ$ on one of our laptops and 273$^\circ$ on the other, and in the CI
+Docker image, with a different OpenCV build, it registers only 35 frames.
+Fig.~\ref{fig:traj} shows the 273$^\circ$ run: the path is an open curve that
+cuts through the points, not a circle. A spinning object only equals an
+orbiting camera if no static point is matched, and the motion filter cannot
+guarantee that.
 
 We also tried a dense step but left it out of the final pipeline. It used
 Farneback optical flow between posed frame pairs and triangulated every pixel
