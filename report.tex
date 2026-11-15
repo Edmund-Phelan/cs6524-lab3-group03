@@ -177,14 +177,25 @@ cuts through the points, not a circle. A spinning object only equals an
 orbiting camera if no static point is matched, and the motion filter cannot
 guarantee that.
 
-We also tried a dense step but left it out of the final pipeline. It used
-Farneback optical flow between posed frame pairs and triangulated every pixel
-with the poses from Section~\ref{sec:nframe}. Depth from a single pair was very
-noisy. We measured noise as the distance from each dense point to the nearest
-sparse point. Keeping only voxels confirmed by three frame pairs cut the 90th
-percentile of this distance from about 100 to about 5 sparse spacings. The
-result for video a showed the checkerboard and the Bulbasaur. Video b was
-unusable, because its camera poses were already wrong.
+Step 6 builds a dense cloud for the reference runs a\_10u and b\_10u. Each
+registered frame is paired with the next frame that has rotated by at least
+5$^\circ$. The pair is stereo-rectified with the poses from
+Section~\ref{sec:nframe}, and semi-global block matching (SGBM) gives a
+disparity for every second pixel. The disparity search is limited to the depth
+range of the sparse points that frame sees, widened by 20\%. Each valid pixel is
+then back-projected into the world frame. To average across frames, points are
+binned into voxels 1/300 of the sparse cloud's size. A voxel keeps the mean
+position and colour of its points, and only if at least three frame pairs hit
+it. This removes most single-pair noise. In video a, the median distance from a
+dense point to the nearest sparse point falls from 55 to 3.9 sparse spacings
+(90th percentile: 135 to 14), and the cloud shrinks from 315k to 15k points.
+Even so, the cloud for a is a halo of streaks around the Bulbasaur, not a
+surface. The streaks run along the viewing rays, where depth from a short
+baseline is least certain. Video b gives 60k points. Seen from its first camera
+they show the checkerboard and the Bulbasaur, but that view hides depth errors
+along its own rays. From above, the figure merges with the background, which
+SGBM still matches even though we clip the cloud to the sparse points' bounding
+box.
 
 With more time, we would make the following changes:
 \begin{itemize}

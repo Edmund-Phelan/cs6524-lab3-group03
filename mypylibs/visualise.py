@@ -76,6 +76,33 @@ def track_length_hist(res: FeatureResult, width=400, height=200):
     return img
 
 
+def render_cloud(X, colours, R, t, K, size=(360, 640)):
+    """Splat a point cloud (RGB colours) into a white image seen from pose x_cam = R X + t.
+
+    Far points are drawn first so near ones end on top (painter's algorithm).
+    """
+    w, h = size
+    Xc = X @ R.T + t
+    front = Xc[:, 2] > 1e-3
+    Xc, colours = Xc[front], colours[front]
+    p = Xc @ K.T
+    p = (p[:, :2] / p[:, 2:]).astype(int)
+    img = np.full((h, w, 3), 255, np.uint8)
+    for (x, y), c in zip(p[np.argsort(-Xc[:, 2])], colours[np.argsort(-Xc[:, 2])]):
+        if 0 <= x < w and 0 <= y < h:
+            cv2.circle(img, (int(x), int(y)), 1, (int(c[2]), int(c[1]), int(c[0])), -1)
+    return img
+
+
+def cloud_views(X, colours, K):
+    """First-camera view next to a top-down view of the cloud (for the report)."""
+    c = np.median(X, 0)
+    dist = 3 * np.percentile(np.linalg.norm(X - c, axis=1), 90)
+    top = np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0.]])  # look down the world -y axis
+    return np.hstack([render_cloud(X, colours, np.eye(3), np.zeros(3), K),
+                      render_cloud(X, colours, top, -top @ c + [0, 0, dist], K)])
+
+
 def save_step2(frames, res: FeatureResult, prefix: str, frame_idx: int = 0):
     """Write keypoints / matches / tracks / histogram PNGs for one frame, e.g. prefix='out/a'."""
     i = min(frame_idx, len(frames) - 2)

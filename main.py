@@ -4,9 +4,10 @@ import time
 import cv2
 import numpy as np
 
+from mypylibs.dense import densify
 from mypylibs.sfm import (load_camera, point_errors, read_frames, reconstruct, relative_poses,
                           track_colours, triangulate_pairs, undistort, write_ply)
-from mypylibs.visualise import save_video
+from mypylibs.visualise import cloud_views, save_video
 
 ROOT_IN = 'in'
 ROOT_OUT = 'out'
@@ -44,8 +45,12 @@ def run(name, raw, K0, D, factor, undist):
     write_ply(f'{ROOT_OUT}/{tag}.ply', np.array(list(pts.values())).reshape(-1, 3),
               track_colours(pts, feats, frames))
 
-    if factor == 1.0 and undist:  # reference run: also keep the keypoint/track overlay video
+    if factor == 1.0 and undist:  # reference run: overlay video and step 6 dense cloud
         save_video(frames, feats, f'{ROOT_OUT}/{name}_overlay.mp4')
+        X, colours = densify(frames, cams, pts, feats, K)
+        print(f'{name}: step 6 dense cloud {len(X)} points', flush=True)
+        write_ply(f'{ROOT_OUT}/{name}_dense.ply', X, colours)
+        cv2.imwrite(f'{ROOT_OUT}/{name}_dense.png', cloud_views(X, colours, K))
 
     m = {
         'run': tag,
