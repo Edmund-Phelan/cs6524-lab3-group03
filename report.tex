@@ -9,7 +9,7 @@
 \usepackage{textcomp}
 \usepackage{xcolor}
 \usepackage[backend=biber,style=numeric]{biblatex}
-\addbibresource{assets/latex/report.bib} 
+\addbibresource{assets/latex/report.bib}
 
  \graphicspath{{assets/latex/}}
 
@@ -17,91 +17,158 @@
 
 \title{CS6524 Computer Vision Lab. 3\\ Structure from Motion}
 
-\author{\IEEEauthorblockN{1\textsuperscript{st} Given Name Surname}
-\IEEEauthorblockA{\textit{dept. name of organization (of Aff.)} \\
-\textit{name of organization (of Aff.)}\\
-City, Country \\
-email address or ORCID}
+\author{\IEEEauthorblockN{Edmund Phelan}
+\IEEEauthorblockA{\textit{University of Limerick}\\
+Student ID 23397179}
 \and
-\IEEEauthorblockN{2\textsuperscript{nd} Given Name Surname}
-\IEEEauthorblockA{\textit{dept. name of organization (of Aff.)} \\
-\textit{name of organization (of Aff.)}\\
-City, Country \\
-email address or ORCID}
-\and
-\IEEEauthorblockN{2\textsuperscript{nd} Given Name Surname}
-\IEEEauthorblockA{\textit{dept. name of organization (of Aff.)} \\
-\textit{name of organization (of Aff.)}\\
-City, Country \\
-email address or ORCID}
+\IEEEauthorblockN{Andrew Jaffray}
+\IEEEauthorblockA{\textit{University of Limerick}\\
+Student ID 23382163}
 }
 
 \maketitle
 
 \begin{abstract}
-Describe in few words the work done, the lessons learned, and results.
+% EDDIE (write last, ~5 lines): what was built, headline result, headline failure.
+%  - Pipeline: SIFT tracks -> essential matrix per pair -> PnP + bundle adjustment over N frames.
+%  - Headline result: video a, all 58 frames registered, closed 360 deg loop (369 deg summed),
+%    median reprojection error 0.27 px.
+%  - Headline failure: video b (spinning object) only survives the true focal length;
+%    one slow frame pair breaks the chain. Dense step was attempted and dropped.
 \end{abstract}
 
-\section{Introduction}
-This document contains some examples of basic {\LaTeX} functions.
+\section{Setup}
+% EDDIE (~1/4 page):
+%  - Object: the toy figure standing on the printed checkerboard on a table.
+%  - Camera: iPhone 15, intrinsics K and distortion D from Lab 2 (camera 02), calibrated
+%    on 640x360 landscape frames and converted to portrait (fx'=fy, fy'=fx, cx'=359-cy,
+%    cy'=cx, p1'=p2, p2'=-p1; see mypylibs/sfm.py load_camera). Say why the swap is needed.
+%  - Video a: camera walked 360 deg around the static object.
+%    Video b: camera still, object spun 360 deg by hand on the table.
+%  - Preprocessing (mypylibs/preprocess.py): 1080x1920 -> 360x640, every 2nd frame (~15 fps)
+%    to stay under 5 MB. Frame sampling for SfM: a every 5th frame (58 frames, ~1 deg
+%    between raw frames is too small a baseline), b every frame (125 frames).
+%  - Frames undistorted with cv2.undistort(K, D); afterwards K is used with zero
+%    distortion. Mention D has a large k3 (5.29) and what that implies.
 
-\subsection{Lists}
+\section{Methodology}
 
-List can be bulleted\dots
-\begin{itemize}
-\item First
-\item Second
-\item Third
-\end{itemize}
+\subsection{Features and Tracks}
+% ANDREW (~1 paragraph), mypylibs/features.py:
+%  - SIFT \cite{lowe2004sift}, 2000 strongest keypoints/frame, brute-force L2 matching of
+%    consecutive frames.
+%  - Lowe ratio test 0.75 + one-to-one constraint (why: otherwise two physical points
+%    merge into one track).
+%  - RANSAC on the essential matrix, 1 px threshold, removes outliers; E is reused in II-B.
+%  - Matches chained into tracks {frame: keypoint}; tracks are what link >2 frames in II-C.
+%  - Video b only: matches moving < 1 px dropped (static background). Without it the
+%    background outvotes the object (step 5 summed rotation 103 deg vs ~360 deg).
 
-Or enumerated
+\subsection{Pairwise Pose and Triangulation}
+% ANDREW (~1 paragraph), relative_poses + triangulate_pairs in sfm.py:
+%  - cv2.recoverPose(E) -> R, t with |t| = 1 (scale unknown in monocular SfM); the
+%    cheirality check picks 1 of the 4 decompositions \cite{foundationsCVbook}.
+%    The first and last pairs of a fail it: camera barely moving at start/end of recording.
+%  - Camera i = K[I|0], camera i+1 = K[R|t], cv2.triangulatePoints, drop points behind
+%    either camera, reproject into both frames. Optional equation:
+%    e = || x - \pi(K [R|t] X) ||.
+%  - Median reprojection error ~0.14 px in EVERY run of Table I, including runs that later
+%    collapse: with 2 views and RANSAC at 1 px it is near zero by construction, so it says
+%    nothing about the final reconstruction. One or two sentences, this is a key insight.
 
-\begin{enumerate}
-\item First
-\item Second
-\item Third
-\end{enumerate}
+\subsection{N-Frame Reconstruction}
+% EDDIE (~1 paragraph), reconstruct + bundle_adjust in sfm.py:
+%  - Init pair: first pair with >= 50 shared tracks and >= 3 deg rotation (why not
+%    frames 0-1: b barely moves at the start, 0.1 deg).
+%  - Each later frame: PnP-RANSAC on tracks that already have a 3D point -> pose in the
+%    same world frame and scale; then triangulate new tracks (>= 1 deg parallax, < 4 px).
+%  - Local bundle adjustment of the last 8 poses every 5 frames, one global BA at the end,
+%    Huber loss f_scale = 2 px (why 2 px and not 1 px: your synthetic test, 4 vs 0.3 deg)
+%    \cite{foundationsCVbook}.
+%  - Output: sparse cloud coloured from the frames -> the PLY files.
 
-\subsection{Equations}
+\section{Results}
+% ANDREW (~1 paragraph before the table):
+%  - Sensitivity setup (main.py): fx, fy scaled by 0.8, 1.0, 1.2; the scaled K is used
+%    everywhere, undistortion included (simulates a consistently wrong calibration). State
+%    this choice clearly. Each with and without undistortion -> 6 runs per video, 12 PLYs.
+%  - Metrics: frames registered, sparse points, step-5 median reprojection error, summed
+%    rotation between consecutive registered frames (should be ~360 deg for a full turn).
+%  - Point readers to the key rows (a_10u best; a_08d and the non-1.0 b runs collapse).
+%    Interpretation goes in IV, not here.
 
-Equations can have their own environment,
-\begin{equation}
-a+b=\gamma\label{eq}
-\end{equation}
-and be reference (Equation~\ref{eq}), or can be inline and blend in the text like this: $\sum_{i=0}^{N}x_i$, like any other word.
-
-\subsection{Figures and Tables}
-
-\begin{table}
-\caption{Table Type Styles}
+\begin{table}[t]
+\caption{Sensitivity analysis: 12 runs (focal factor $\times$ undistortion)}
 \begin{center}
-\begin{tabular}{|c|c|c|c|}
+\begin{tabular}{|l|c|c|c|c|}
 \hline
-\textbf{Table}&\multicolumn{3}{|c|}{\textbf{Table Column Head}} \\
-\cline{2-4} 
-\textbf{Head} & \textbf{\textit{Table column subhead}}& \textbf{\textit{Subhead}}& \textbf{\textit{Subhead}} \\
+\textbf{Run} & \textbf{Registered} & \textbf{Points} & \textbf{Err. (px)} & \textbf{Rot. ($^\circ$)} \\
 \hline
-copy& More table copy$^{\mathrm{a}}$& &  \\
+a\_08u & 54/58 & 1902 & 0.52 & 392.5 \\
+a\_10u & 58/58 & 2455 & 0.27 & 369.3 \\
+a\_12u & 58/58 & 2861 & 0.37 & 399.7 \\
+a\_08d & 9/58 & 143 & 0.18 & 38.1 \\
+a\_10d & 58/58 & 2766 & 0.27 & 375.0 \\
+a\_12d & 58/58 & 2711 & 0.41 & 402.8 \\
 \hline
-\multicolumn{4}{l}{$^{\mathrm{a}}$Sample of a Table footnote.}
+b\_08u & 36/125 & 1882 & 0.23 & 58.9 \\
+b\_10u & 122/125 & 4704 & 0.39 & 362.4 \\
+b\_12u & 41/125 & 2250 & 0.25 & 76.6 \\
+b\_08d & 66/125 & 3213 & 0.32 & 136.7 \\
+b\_10d & 124/125 & 6753 & 0.26 & 375.0 \\
+b\_12d & 43/125 & 2471 & 0.23 & 78.6 \\
+\hline
 \end{tabular}
-\label{tab1}
+\label{tab:sens}
 \end{center}
+% ANDREW: re-check these against out/metrics.csv after the final run if any code changes.
 \end{table}
 
-\begin{figure}
-% Uncomment the line below to include an image from a source file
-\centerline{\includegraphics{fig1.png}}
-\caption{Example of a figure caption.}
-\label{fig}
-\end{figure}
+% EDDIE: Figure 1, top-down view of the recovered camera centres + sparse cloud for
+% a_10u (closed loop around the object) and b_10u (uneven arc). Save as
+% assets/latex/trajectory.png, then uncomment the block below.
+% \begin{figure}[t]
+% \centerline{\includegraphics[width=\columnwidth]{trajectory.png}}
+% \caption{Top view of camera centres (red) and sparse points for videos a (left) and b (right).}
+% \label{fig:traj}
+% \end{figure}
 
-They appear by default on top of the text, and you reference like this: Figure~\ref{fig} and Table~\ref{tab1}.
+\section{Discussion and Failure Analysis}
+% EDDIE, paragraph 1: sensitivity of video a (focal length + distortion).
+%  - a tolerates a wrong focal length: all/most frames registered at 0.8 and 1.2, but the
+%    summed rotation inflates (369 -> 392-403 deg): wrong f distorts angles, so the loop
+%    no longer closes.
+%  - Distortion matters in combination: a_10d is fine (375 deg), a_08d collapses (9/58).
+%    Explain why error in f + uncorrected k1..k3 pushes PnP past its tolerance.
 
-\subsection{Citations}
+% EDDIE, paragraph 2: failure of video b.
+%  - Only the true focal length survives: 36-43/125 frames at 0.8 and 1.2.
+%  - Single point of failure at frame pair 36: object nearly pauses (hand repositioning?).
+%    With the 1 px motion filter only 35 inliers remain there (vs ~150) and 4-9 tracks span
+%    it, so PnP loses the chain. 0.5 px keeps 146 inliers / ~72 tracks.
+%  - Camera path (Fig. 1) is an arc, not a circle, even in the best run: the
+%    spinning-object = orbiting-camera equivalence only holds if nothing static is matched.
+%  - Supporting evidence: b_10u registers 122/125 frames on macOS but 35/125 in the CI
+%    Docker image (different OpenCV build) -> b sits on a knife edge.
 
-If you need to cite external sources, use the \texttt{assets/latex/report.bib} file. As an example, here's how you cite the textbook~\cite{foundationsCVbook}.
+% ANDREW, paragraph 3: dense reconstruction omitted (2-3 sentences).
+%  - Tried: Farneback optical flow between posed frame pairs, every
+%    pixel triangulated with the step-5 poses, forward-backward flow check, voxel averaging.
+%  - Two-view flow depth was very noisy; requiring 3 frame pairs to agree per voxel cut the
+%    90th-percentile distance to the sparse cloud from ~100 to ~5 sparse spacings; a showed
+%    the board + toy, but b was unusable (bad poses) -> left out of the final pipeline.
 
+% ANDREW, paragraph 4: concrete improvements (short list or 1 paragraph).
+%  - Match i -> i+2 as well, so one weak pair cannot break tracks (fixes b's pair 36).
+%  - Loop closure: match the last frames to the first, add to global BA (369 vs 360 deg).
+%  - Refine fx, fy inside bundle adjustment (self-calibration) -> targets the focal
+%    sensitivity of paragraph 1.
+%  - Segment/mask the object in b instead of a motion threshold.
+%  - Dense: multi-view stereo (depth maps checked across several views) instead of
+%    two-view flow.
+
+% Add \cite{...} in the text; unused entries are not printed.
+% Available keys: foundationsCVbook, lowe2004sift
 \printbibliography
 
 \end{document}
