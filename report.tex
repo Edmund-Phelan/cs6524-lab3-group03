@@ -156,21 +156,25 @@ b\_12d & 43/125 & 2471 & 0.23 & 78.6 \\
 %  - Supporting evidence: b_10u registers 122/125 frames on macOS but 35/125 in the CI
 %    Docker image (different OpenCV build) -> b sits on a knife edge.
 
-% ANDREW, paragraph 3: dense reconstruction omitted (2-3 sentences).
-%  - Tried: Farneback optical flow between posed frame pairs, every
-%    pixel triangulated with the step-5 poses, forward-backward flow check, voxel averaging.
-%  - Two-view flow depth was very noisy; requiring 3 frame pairs to agree per voxel cut the
-%    90th-percentile distance to the sparse cloud from ~100 to ~5 sparse spacings; a showed
-%    the board + toy, but b was unusable (bad poses) -> left out of the final pipeline.
+We also tried a dense step but left it out of the final pipeline. It used
+Farneback optical flow between posed frame pairs and triangulated every pixel
+with the poses from Section~\ref{sec:nframe}. Depth from a single pair was very
+noisy. We measured noise as the distance from each dense point to the nearest
+sparse point. Keeping only voxels confirmed by three frame pairs cut the 90th
+percentile of this distance from about 100 to about 5 sparse spacings. The
+result for video a showed the checkerboard and the Bulbasaur. Video b was
+unusable, because its camera poses were already wrong.
 
-% ANDREW, paragraph 4: concrete improvements (short list or 1 paragraph).
-%  - Match i -> i+2 as well, so one weak pair cannot break tracks (fixes b's pair 36).
-%  - Loop closure: match the last frames to the first, add to global BA (369 vs 360 deg).
-%  - Refine fx, fy inside bundle adjustment (self-calibration) -> targets the focal
-%    sensitivity of paragraph 1.
-%  - Segment/mask the object in b instead of a motion threshold.
-%  - Dense: multi-view stereo (depth maps checked across several views) instead of
-%    two-view flow.
+With more time, we would make the following changes:
+\begin{itemize}
+\item Match each frame to frame $i{+}2$ as well. One weak pair could then no
+longer break the tracks in video b.
+\item Match the last frames back to the first to close the loop. This would
+pull the summed rotation from 369$^\circ$ back to 360$^\circ$.
+\item Refine $f_x$ and $f_y$ inside bundle adjustment. This targets the focal
+length errors directly.
+\item Mask the Bulbasaur in video b instead of filtering by motion.
+\end{itemize}
 
 % Add \cite{...} in the text; unused entries are not printed.
 % Available keys: foundationsCVbook, lowe2004sift
