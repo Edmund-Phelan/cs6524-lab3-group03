@@ -61,19 +61,19 @@ matches are kept one-to-one. RANSAC on the essential matrix (1\,px) then leaves
 about 107 inliers per frame pair. Chaining these matches gives tracks. In total,
 411 tracks in a and 980 in b span five or more frames. In video b we drop
 matches that move less than 1\,px. Otherwise the static background outvotes the
-spinning object.
+spinning Pokemon figure.
 
 \subsection{Pairwise Pose and Triangulation}\label{sec:pose}
-% ANDREW (~1 paragraph), relative_poses + triangulate_pairs in sfm.py:
-%  - cv2.recoverPose(E) -> R, t with |t| = 1 (scale unknown in monocular SfM); the
-%    cheirality check picks 1 of the 4 decompositions \cite{foundationsCVbook}.
-%    The first and last pairs of a fail it: camera barely moving at start/end of recording.
-%  - Camera i = K[I|0], camera i+1 = K[R|t], cv2.triangulatePoints, drop points behind
-%    either camera, reproject into both frames. Optional equation:
-%    e = || x - \pi(K [R|t] X) ||.
-%  - Median reprojection error ~0.14 px in EVERY run of Table I, including runs that later
-%    collapse: with 2 views and RANSAC at 1 px it is near zero by construction, so it says
-%    nothing about the final reconstruction. One or two sentences, this is a key insight.
+Each essential matrix is decomposed into a rotation $R$ and translation $t$.
+The cheirality check picks the one solution that puts the points in front of
+both cameras~\cite{foundationsCVbook}. The scale of $t$ is unknown, so we set
+$|t|=1$. In video a the first and last pairs fail this check, because the
+camera barely moves before and after the walk around the Pokemon. We then place frame $i$ at $K[I|0]$ and frame $i{+}1$
+at $K[R|t]$ and triangulate the inliers. Points behind either camera are
+dropped. Reprojecting the points into both frames gives a median error of
+0.12--0.16\,px in every run of Table~\ref{tab:sens}. This includes runs that
+later collapse. With only two views and a 1\,px RANSAC threshold, the error is
+small by construction. It therefore says little about the final reconstruction.
 
 \subsection{N-Frame Reconstruction}\label{sec:nframe}
 % EDDIE (~1 paragraph), reconstruct + bundle_adjust in sfm.py:
