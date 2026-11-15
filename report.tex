@@ -38,18 +38,23 @@ works at the true focal length, since one slow frame pair breaks the chain.
 \end{abstract}
 
 \section{Setup}
-% EDDIE (~1/4 page):
-%  - Object: the toy figure standing on the printed checkerboard on a table.
-%  - Camera: iPhone 15, intrinsics K and distortion D from Lab 2 (camera 02), calibrated
-%    on 640x360 landscape frames and converted to portrait (fx'=fy, fy'=fx, cx'=359-cy,
-%    cy'=cx, p1'=p2, p2'=-p1; see mypylibs/sfm.py load_camera). Say why the swap is needed.
-%  - Video a: camera walked 360 deg around the static object.
-%    Video b: camera still, object spun 360 deg by hand on the table.
-%  - Preprocessing (mypylibs/preprocess.py): 1080x1920 -> 360x640, every 2nd frame (~15 fps)
-%    to stay under 5 MB. Frame sampling for SfM: a every 5th frame (58 frames, ~1 deg
-%    between raw frames is too small a baseline), b every frame (125 frames).
-%  - Frames undistorted with cv2.undistort(K, D); afterwards K is used with zero
-%    distortion. Mention D has a large k3 (5.29) and what that implies.
+\begin{itemize}
+\item \textbf{Object:} a Bulbasaur (Pokemon) figure standing on a printed
+checkerboard on a table.
+\item \textbf{Videos:} in video a the camera walks a full circle around the
+figure. In video b the camera stays still and the figure is turned by hand.
+\item \textbf{Camera:} an iPhone 15, with $K$ and $D$ from our Lab~2
+calibration ($f \approx 623$\,px). That calibration used landscape frames, so we
+rotate $K$ and $D$ to portrait: $f_x$ and $f_y$ swap, and so do $c_x$ and $c_y$.
+\item \textbf{Preprocessing:} each video is resized from $1080\times1920$ to
+$360\times640$ and every second frame is kept (about 15\,fps). This keeps each
+file under 5\,MB.
+\item \textbf{Frame sampling:} video a uses every 5th frame (58 frames), since
+consecutive frames are only about 1$^\circ$ apart. Video b uses all 125 frames.
+\item \textbf{Undistortion:} $D$ has large $k_2$ and $k_3$ terms that mostly
+cancel. The net correction is still 17--19\,px at the image corners and zero at
+the centre.
+\end{itemize}
 
 \section{Methodology}
 
